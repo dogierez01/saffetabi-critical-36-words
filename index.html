@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="google" content="notranslate">
-    <title>Lingua Pharmacia Talkback</title>
+    <title>Lingua Pharmacia - Verbs</title>
     <style>
         body { font-family: Arial, sans-serif; text-align: center; background-color: #000; color: #fff; margin: 0; padding: 20px; }
         .screen { display: none; }
@@ -14,8 +14,8 @@
         
         button { background-color: #007bff; color: white; border: none; padding: 15px 30px; font-size: 20px; font-weight: bold; border-radius: 8px; cursor: pointer; margin: 10px; }
         
-        .lesson-btn { display: block; width: 85%; max-width: 380px; margin: 12px auto; background-color: #28a745; }
-        .lesson-btn:disabled { background-color: #444; color: #888; cursor: not-allowed; }
+        .menu-btn { display: block; width: 85%; max-width: 380px; margin: 12px auto; background-color: #28a745; }
+        .back-btn { background-color: #6c757d; font-size: 16px; margin-bottom: 20px; }
 
         #turkish-sentence { font-size: 30px; margin: 30px 0; font-weight: bold; }
         #mic-btn { background-color: #dc3545; border-radius: 50px; padding: 25px 50px; font-size: 22px; transition: background-color 0.3s; }
@@ -31,7 +31,6 @@
         .tracker-box { background: #222; padding: 15px; border-radius: 10px; margin-bottom: 20px; display: inline-block; font-size: 22px; border: 1px solid #444; }
         
         .ios-warning { color: #ffc107; font-size: 18px; font-weight: bold; margin: 10px 20px 30px 20px; line-height: 1.4; background: rgba(255, 193, 7, 0.1); padding: 15px; border-radius: 8px; border: 1px solid #ffc107; }
-        
         .version-tag { font-size: 12px; color: #444; margin-top: 40px; }
     </style>
 </head>
@@ -43,28 +42,35 @@
             📱 iPhone Users: Please open this app directly in Safari or Chrome. Do not use the browser inside WhatsApp or Instagram, or your microphone will not work!
         </div>
         <br><button onclick="showScreen('instructions-screen')">Continue</button>
-        <div class="version-tag">Engine: Lax Grading v1</div>
+        <div class="version-tag">Engine: Mastery Loop v3</div>
     </div>
 
     <div id="instructions-screen" class="screen">
         <img src="%20instructions.jpg" alt="Instructions Image">
-        <br><button onclick="showScreen('menu-screen')">Continue</button>
-        <div class="version-tag">Engine: Lax Grading v1</div>
+        <br><button onclick="showScreen('set-menu-screen')">Continue</button>
+        <div class="version-tag">Engine: Mastery Loop v3</div>
     </div>
 
-    <div id="menu-screen" class="screen">
-        <h2>Select a Lesson</h2>
-        <div id="lesson-list"></div>
+    <div id="set-menu-screen" class="screen">
+        <h2>Select a Set</h2>
+        <div id="set-list"></div>
         <br>
         <button onclick="resetProgress()" style="background-color: #dc3545; font-size: 16px; padding: 10px 20px; margin-top: 30px;">⚠️ Reset All Progress</button>
-        <div class="version-tag">Engine: Lax Grading v1</div>
+        <div class="version-tag">Engine: Mastery Loop v3</div>
+    </div>
+
+    <div id="chunk-menu-screen" class="screen">
+        <h2 id="chunk-menu-title">Chunks</h2>
+        <button class="back-btn" onclick="showScreen('set-menu-screen')">⬅️ Back to Sets</button>
+        <div id="chunk-list"></div>
+        <div class="version-tag">Engine: Mastery Loop v3</div>
     </div>
 
     <div id="game-screen" class="screen">
-        <button onclick="backToMenu()" style="background:#6c757d; font-size: 16px;">Back to Menu</button>
+        <button class="back-btn" onclick="backToChunkMenu()">⬅️ Back to Chunks</button>
         
         <div class="tracker-box">
-            Progress: <span id="current-question" style="color:#00ffff;">1</span> / <span id="total-questions">20</span> <br>
+            Progress: <span id="current-question" style="color:#00ffff;">1</span> / <span id="total-questions">?</span> <br>
             Score: <span id="current-score" style="color:#28a745;">0</span>
         </div>
         
@@ -78,43 +84,68 @@
         <button id="next-btn" onclick="nextSentence()" style="display:none; background-color: #007bff;">Next Sentence ➡️</button>
         <button id="finish-btn" onclick="finishLesson()" style="display:none; background-color: #28a745;">Finish Lesson 🎉</button>
         
-        <div class="version-tag">Engine: Lax Grading v1</div>
+        <div class="version-tag">Engine: Mastery Loop v3</div>
     </div>
 
     <script>
+        // ==========================================
+        // APP SETTINGS
+        // ==========================================
+        const TOTAL_SETS = 5; 
+        const CHUNKS_PER_SET = 4;
+        // ==========================================
+
+        let activeSetId = null;
+        let activeChunkId = null;
+        let chunkScores = JSON.parse(localStorage.getItem('chunkScores')) || {};
+
         function showScreen(id) {
             document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
             document.getElementById(id).classList.add('active');
-            if(id === 'menu-screen') buildMenu();
+            if(id === 'set-menu-screen') buildSetMenu();
         }
 
-        const lessons = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10A", "10B", "11", "12", "13", "14", "15", "16", "17", "18", "19"];
-        
-        let lessonScores = JSON.parse(localStorage.getItem('lessonScores')) || {};
-
-        function buildMenu() {
-            const list = document.getElementById('lesson-list');
+        function buildSetMenu() {
+            const list = document.getElementById('set-list');
             list.innerHTML = '';
-            lessons.forEach(l => {
+            for(let i = 1; i <= TOTAL_SETS; i++) {
                 const btn = document.createElement('button');
-                btn.className = 'lesson-btn';
+                btn.className = 'menu-btn';
+                btn.innerText = `Set ${i}`;
+                btn.onclick = () => openChunkMenu(i);
+                list.appendChild(btn);
+            }
+        }
+
+        function openChunkMenu(setId) {
+            activeSetId = setId;
+            document.getElementById('chunk-menu-title').innerText = `Set ${setId} - Chunks`;
+            
+            const list = document.getElementById('chunk-list');
+            list.innerHTML = '';
+            
+            for(let i = 1; i <= CHUNKS_PER_SET; i++) {
+                const btn = document.createElement('button');
+                btn.className = 'menu-btn';
                 
-                let btnText = `Lesson ${l}`;
-                if (lessonScores[l] !== undefined) {
-                    btnText += ` (Best: ${lessonScores[l]})`;
+                const fileKey = `set${setId}-chunk${i}`;
+                let btnText = `Chunk ${i}`;
+                if (chunkScores[fileKey] !== undefined) {
+                    btnText += ` (Best: ${chunkScores[fileKey]})`;
                 }
                 
-                btn.onclick = () => startLesson(l);
                 btn.innerText = btnText;
+                btn.onclick = () => startLesson(setId, i);
                 list.appendChild(btn);
-            });
+            }
+            showScreen('chunk-menu-screen');
         }
 
         function resetProgress() {
             if (confirm("Are you sure you want to reset all progress? All scores will be lost.")) {
-                localStorage.removeItem('lessonScores');
-                lessonScores = {};
-                buildMenu();
+                localStorage.removeItem('chunkScores');
+                chunkScores = {};
+                buildSetMenu();
                 alert("Progress has been reset.");
             }
         }
@@ -126,18 +157,35 @@
             }
         }
 
-        let currentPairs = [], currentIndex = 0, score = 0, currentLessonId = "";
+        // --- MASTERY LOOP VARIABLES ---
+        let currentPairs = [];
+        let recycleBin = [];
+        let isRecyclePhase = false;
+        let currentIndex = 0; 
+        let score = 0;
+        let attemptsLeft = 2; // Each sentence gets exactly 2 tries per phase
 
-        async function startLesson(id) {
-            currentLessonId = id;
+        async function startLesson(setId, chunkId) {
+            activeSetId = setId;
+            activeChunkId = chunkId;
             showScreen('game-screen');
-            currentIndex = 0; score = 0;
+            
+            // Reset Mastery Variables
+            currentIndex = 0; 
+            score = 0;
+            recycleBin = [];
+            isRecyclePhase = false;
             
             document.getElementById('current-score').innerText = "0";
             document.getElementById('current-question').innerText = "1";
+            document.getElementById('total-questions').innerText = "...";
+            
+            const fileName = `set${setId}-chunk${chunkId}.csv`;
             
             try {
-                const res = await fetch(`lesson${id.toLowerCase()}.csv`);
+                const res = await fetch(fileName);
+                if (!res.ok) throw new Error("File not found");
+                
                 const text = await res.text();
                 const lines = text.split('\n').filter(l => l.trim() !== '').slice(1);
                 currentPairs = lines.map(line => {
@@ -148,23 +196,36 @@
                 shuffleArray(currentPairs);
                 document.getElementById('total-questions').innerText = currentPairs.length;
                 loadSentence();
-            } catch (e) { alert("Error loading CSV file."); }
+            } catch (e) { 
+                alert(`Error: Could not load ${fileName}. Make sure the file exists in your repository exactly as named.`); 
+                showScreen('chunk-menu-screen');
+            }
         }
 
         function loadSentence() {
+            attemptsLeft = 2; // Reset attempts to 2 for the new sentence
             document.getElementById('next-btn').style.display = 'none';
+            document.getElementById('finish-btn').style.display = 'none';
             document.getElementById('mic-btn').style.display = 'inline-block';
-            document.getElementById('turkish-sentence').innerText = currentPairs[currentIndex].tr;
-            document.getElementById('current-question').innerText = currentIndex + 1;
+            
+            const pair = isRecyclePhase ? recycleBin[currentIndex] : currentPairs[currentIndex];
+            document.getElementById('turkish-sentence').innerText = pair.tr;
+            
+            if (!isRecyclePhase) {
+                document.getElementById('current-question').innerText = currentIndex + 1;
+                document.getElementById('total-questions').innerText = currentPairs.length;
+            } else {
+                document.getElementById('current-question').innerText = `Recycle ${currentIndex + 1}`;
+                document.getElementById('total-questions').innerText = recycleBin.length;
+            }
+
             document.getElementById('feedback').innerHTML = '';
             document.getElementById('recognized-text').innerText = '';
-            
             document.getElementById('mic-btn').innerText = "🎤 Tap to Speak";
         }
 
         function normalize(t) {
             let s = t.toLowerCase().replace(/[.,?!'’]/g, "").trim();
-            
             const contractions = {
                 "didn't":"did not", "didnt":"did not", "don't":"do not", "dont":"do not", "doesn't":"does not", "doesnt":"does not",
                 "won't":"will not", "wont":"will not", "can't":"can not", "cant":"can not", "cannot":"can not",
@@ -174,20 +235,16 @@
             };
             for(let k in contractions) s = s.replace(new RegExp("\\b"+k+"\\b","gi"), contractions[k]);
 
-            const micTypos = {
-                "modern": "modem",
-                "by the": "buy the"
-            };
+            const micTypos = { "modern": "modem", "by the": "buy the" };
             for(let key in micTypos) s = s.replace(new RegExp("\\b"+key+"\\b","gi"), micTypos[key]);
 
-            // REMOVE ARTICLES
             s = s.replace(/\b(a|an|the)\b/gi, "").trim();
-
             return s.replace(/\s+/g, " ").trim();
         }
 
         function checkAnswer(spoken) {
-            const rawCorrect = currentPairs[currentIndex].en;
+            const pair = isRecyclePhase ? recycleBin[currentIndex] : currentPairs[currentIndex];
+            const rawCorrect = pair.en;
             
             const correctWithParenthesesText = rawCorrect.replace(/[\(\)]/g, "");
             const correctWithoutParenthesesText = rawCorrect.replace(/\([^)]*\)/g, " ");
@@ -202,36 +259,93 @@
             if(isCorrect) { 
                 f.innerHTML = "Correct!"; 
                 f.className = "correct"; 
-                score++; 
+                
+                // Only award points on the very first try of the main lesson
+                if (!isRecyclePhase && attemptsLeft === 2) {
+                    score++; 
+                    document.getElementById('current-score').innerText = score;
+                }
+                showNextOrFinish();
             } else { 
-                f.innerHTML = `Incorrect.<br><span class="correction">${correctWithParenthesesText}</span>`; 
-                f.className = "incorrect"; 
+                attemptsLeft--;
+                
+                if (attemptsLeft > 0) {
+                    // Miss #1 (Show what they said, let them try again immediately)
+                    f.innerHTML = `Incorrect. Try again!`; 
+                    f.className = "incorrect"; 
+                    document.getElementById('mic-btn').style.display = 'inline-block';
+                    document.getElementById('mic-btn').innerText = "🎤 Tap to Retry";
+                } else {
+                    // Miss #2 (Out of attempts for this sentence)
+                    if (!isRecyclePhase) {
+                        // Main Lesson Miss #2 - Hide answer, send to recycle bin
+                        f.innerHTML = `Incorrect. We will review this later.`; 
+                        f.className = "incorrect"; 
+                        recycleBin.push(pair);
+                        showNextOrFinish();
+                    } else {
+                        // Recycle Phase Miss #2 - FINAL FAIL - Show them the answer
+                        f.innerHTML = `Incorrect.<br><span class="correction">${correctWithParenthesesText}</span>`; 
+                        f.className = "incorrect"; 
+                        showNextOrFinish();
+                    }
+                }
             }
-            
-            document.getElementById('current-score').innerText = score;
-            if(currentIndex < currentPairs.length - 1) document.getElementById('next-btn').style.display = 'inline-block';
-            else document.getElementById('finish-btn').style.display = 'inline-block';
         }
 
-        function nextSentence() { currentIndex++; loadSentence(); }
+        function showNextOrFinish() {
+            let isEndOfPhase = false;
+            
+            if (!isRecyclePhase) {
+                if (currentIndex >= currentPairs.length - 1 && recycleBin.length === 0) isEndOfPhase = true;
+            } else {
+                if (currentIndex >= recycleBin.length - 1) isEndOfPhase = true;
+            }
+
+            if (isEndOfPhase) {
+                document.getElementById('finish-btn').style.display = 'inline-block';
+            } else {
+                document.getElementById('next-btn').style.display = 'inline-block';
+            }
+        }
+
+        function nextSentence() { 
+            if (!isRecyclePhase) {
+                if (currentIndex < currentPairs.length - 1) {
+                    currentIndex++;
+                    loadSentence();
+                } else if (recycleBin.length > 0) {
+                    // Transition to Recycle Phase
+                    isRecyclePhase = true;
+                    currentIndex = 0;
+                    alert("Main lesson complete! Now let's review the sentences you missed.");
+                    loadSentence();
+                }
+            } else {
+                currentIndex++;
+                loadSentence();
+            }
+        }
 
         function saveProgress() {
-            if (!lessonScores[currentLessonId] || score > lessonScores[currentLessonId]) {
-                lessonScores[currentLessonId] = score;
-                localStorage.setItem('lessonScores', JSON.stringify(lessonScores));
+            const fileKey = `set${activeSetId}-chunk${activeChunkId}`;
+            if (!chunkScores[fileKey] || score > chunkScores[fileKey]) {
+                chunkScores[fileKey] = score;
+                localStorage.setItem('chunkScores', JSON.stringify(chunkScores));
             }
         }
 
-        function backToMenu() {
+        function backToChunkMenu() {
             saveProgress();
-            showScreen('menu-screen');
+            openChunkMenu(activeSetId);
         }
 
         function finishLesson() {
             saveProgress();
-            showScreen('menu-screen');
+            openChunkMenu(activeSetId);
         }
 
+        // --- Speech Recognition Engine ---
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         let recognition;
         let silenceTimer = null;
@@ -261,7 +375,10 @@
                 isListening = false;
                 const btn = document.getElementById('mic-btn');
                 btn.classList.remove('listening');
-                btn.innerText = "🎤 Tap to Speak";
+                // Don't override text if the button is hidden or set to "Retry"
+                if(btn.style.display !== 'none' && btn.innerText === "🛑 Stop Listening") {
+                    btn.innerText = "🎤 Tap to Speak";
+                }
                 clearTimeout(silenceTimer);
             };
             
@@ -292,7 +409,7 @@
                 clearTimeout(silenceTimer);
                 
                 if (event.error === 'not-allowed') {
-                    alert("Microphone Blocked! \n\niPhone Users: Go to Settings > Safari > Microphone and select 'Allow'.\n\nAlso, make sure you opened this link directly in Safari, NOT inside WhatsApp or Instagram.");
+                    alert("Microphone Blocked! \n\niPhone Users: Go to Settings > Safari > Microphone and select 'Allow'.\n\nAlso, make sure you opened this link directly in Safari.");
                 } else if (event.error !== 'no-speech') {
                     console.log("Microphone warning: " + event.error);
                 }
@@ -320,8 +437,6 @@
                 }
             }
         }
-
-        buildMenu();
     </script>
 </body>
 </html>
