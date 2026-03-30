@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en" translate="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="google" content="notranslate">
+    <title>Lingua Pharmacia Talkback</title>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; background-color: #000; color: #fff; margin: 0; padding: 20px; }
+        .screen { display: none; }
+        .screen.active { display: block; }
+        
+        img { max-width: 80%; max-height: 70vh; object-fit: contain; height: auto; border-radius: 10px; margin-bottom: 20px; }
+        
+        button { background-color: #007bff; color: white; border: none; padding: 15px 30px; font-size: 20px; font-weight: bold; border-radius: 8px; cursor: pointer; margin: 10px; }
+        
+        .lesson-btn { display: block; width: 85%; max-width: 380px; margin: 12px auto; background-color: #28a745; }
+        .lesson-btn:disabled { background-color: #444; color: #888; cursor: not-allowed; }
+
+        #turkish-sentence { font-size: 30px; margin: 30px 0; font-weight: bold; }
+        #mic-btn { background-color: #dc3545; border-radius: 50px; padding: 25px 50px; font-size: 22px; transition: background-color 0.3s; }
+        #mic-btn.listening { background-color: #ffc107; color: #000; }
+
+        #recognized-text { font-size: 32px; font-weight: bold; margin: 30px 0; color: #ffffff; background: rgba(255, 255, 255, 0.1); padding: 10px; border-radius: 10px; min-height: 40px; }
+
+        #feedback { font-size: 28px; font-weight: bold; min-height: 80px; }
+        .correct { color: #00ffff; text-shadow: 0 0 12px #00ffff; }
+        .incorrect { color: #ff9900; text-shadow: 0 0 12px #ff9900; }
+        .correction { color: #ccff00; text-shadow: 0 0 12px #ccff00; display: block; margin-top: 20px; font-size: 26px; }
+        
+        .tracker-box { background: #222; padding: 15px; border-radius: 10px; margin-bottom: 20px; display: inline-block; font-size: 22px; border: 1px solid #444; }
+        
+        .ios-warning { color: #ffc107; font-size: 18px; font-weight: bold; margin: 10px 20px 30px 20px; line-height: 1.4; background: rgba(255, 193, 7, 0.1); padding: 15px; border-radius: 8px; border: 1px solid #ffc107; }
+        
+        .version-tag { font-size: 12px; color: #444; margin-top: 40px; }
+    </style>
+</head>
+<body>
+
+    <div id="welcome-screen" class="screen active">
+        <img src="logo.png" alt="Logo">
+        <div class="ios-warning">
+            📱 iPhone Users: Please open this app directly in Safari or Chrome. Do not use the browser inside WhatsApp or Instagram, or your microphone will not work!
+        </div>
+        <br><button onclick="showScreen('instructions-screen')">Continue</button>
+        <div class="version-tag">Engine: Lax Grading v1</div>
+    </div>
+
+    <div id="instructions-screen" class="screen">
+        <img src="%20instructions.jpg" alt="Instructions Image">
+        <br><button onclick="showScreen('menu-screen')">Continue</button>
+        <div class="version-tag">Engine: Lax Grading v1</div>
+    </div>
+
+    <div id="menu-screen" class="screen">
+        <h2>Select a Lesson</h2>
+        <div id="lesson-list"></div>
+        <br>
+        <button onclick="resetProgress()" style="background-color: #dc3545; font-size: 16px; padding: 10px 20px; margin-top: 30px;">⚠️ Reset All Progress</button>
+        <div class="version-tag">Engine: Lax Grading v1</div>
+    </div>
+
+    <div id="game-screen" class="screen">
+        <button onclick="backToMenu()" style="background:#6c757d; font-size: 16px;">Back to Menu</button>
+        
+        <div class="tracker-box">
+            Progress: <span id="current-question" style="color:#00ffff;">1</span> / <span id="total-questions">20</span> <br>
+            Score: <span id="current-score" style="color:#28a745;">0</span>
+        </div>
+        
+        <div id="turkish-sentence"></div>
+        
+        <button id="mic-btn" onclick="toggleMic()">🎤 Tap to Speak</button>
+        
+        <div id="recognized-text"></div>
+        <div id="feedback"></div>
+        
+        <button id="next-btn" onclick="nextSentence()" style="display:none; background-color: #007bff;">Next Sentence ➡️</button>
+        <button id="finish-btn" onclick="finishLesson()" style="display:none; background-color: #28a745;">Finish Lesson 🎉</button>
+        
+        <div class="version-tag">Engine: Lax Grading v1</div>
+    </div>
+
+    <script>
+        function showScreen(id) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+            if(id === 'menu-screen') buildMenu();
+        }
+
+        const lessons = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10A", "10B", "11", "12", "13", "14", "15", "16", "17", "18", "19"];
+        
+        let lessonScores = JSON.parse(localStorage.getItem('lessonScores')) || {};
+
+        function buildMenu() {
+            const list = document.getElementById('lesson-list');
+            list.innerHTML = '';
+            lessons.forEach(l => {
+                const btn = document.createElement('button');
+                btn.className = 'lesson-btn';
+                
+                let btnText = `Lesson ${l}`;
+                if (lessonScores[l] !== undefined) {
+                    btnText += ` (Best: ${lessonScores[l]})`;
+                }
+                
+                btn.onclick = () => startLesson(l);
+                btn.innerText = btnText;
+                list.appendChild(btn);
+            });
+        }
+
+        function resetProgress() {
+            if (confirm("Are you sure you want to reset all progress? All scores will be lost.")) {
+                localStorage.removeItem('lessonScores');
+                lessonScores = {};
+                buildMenu();
+                alert("Progress has been reset.");
+            }
+        }
+
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+        }
+
+        let currentPairs = [], currentIndex = 0, score = 0, currentLessonId = "";
+
+        async function startLesson(id) {
+            currentLessonId = id;
+            showScreen('game-screen');
+            currentIndex = 0; score = 0;
+            
+            document.getElementById('current-score').innerText = "0";
+            document.getElementById('current-question').innerText = "1";
+            
+            try {
+                const res = await fetch(`lesson${id.toLowerCase()}.csv`);
+                const text = await res.text();
+                const lines = text.split('\n').filter(l => l.trim() !== '').slice(1);
+                currentPairs = lines.map(line => {
+                    const parts = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/);
+                    return { tr: parts[0].replace(/"/g, '').trim(), en: parts[1].replace(/"/g, '').trim() };
+                });
+                
+                shuffleArray(currentPairs);
+                document.getElementById('total-questions').innerText = currentPairs.length;
+                loadSentence();
+            } catch (e) { alert("Error loading CSV file."); }
+        }
+
+        function loadSentence() {
+            document.getElementById('next-btn').style.display = 'none';
+            document.getElementById('mic-btn').style.display = 'inline-block';
+            document.getElementById('turkish-sentence').innerText = currentPairs[currentIndex].tr;
+            document.getElementById('current-question').innerText = currentIndex + 1;
+            document.getElementById('feedback').innerHTML = '';
+            document.getElementById('recognized-text').innerText = '';
+            
+            document.getElementById('mic-btn').innerText = "🎤 Tap to Speak";
+        }
+
+        function normalize(t) {
+            let s = t.toLowerCase().replace(/[.,?!'’]/g, "").trim();
+            
+            const contractions = {
+                "didn't":"did not", "didnt":"did not", "don't":"do not", "dont":"do not", "doesn't":"does not", "doesnt":"does not",
+                "won't":"will not", "wont":"will not", "can't":"can not", "cant":"can not", "cannot":"can not",
+                "isn't":"is not", "isnt":"is not", "aren't":"are not", "arent":"are not", "wasn't":"was not", "wasnt":"was not", "weren't":"were not", "werent":"were not",
+                "haven't":"have not", "havent":"have not", "hasn't":"has not", "hasnt":"has not", "hadn't":"had not", "hadnt":"had not",
+                "shouldn't":"should not", "shouldnt":"should not", "wouldn't":"would not", "wouldnt":"would not", "couldn't":"could not", "couldnt":"could not"
+            };
+            for(let k in contractions) s = s.replace(new RegExp("\\b"+k+"\\b","gi"), contractions[k]);
+
+            const micTypos = {
+                "modern": "modem",
+                "by the": "buy the"
+            };
+            for(let key in micTypos) s = s.replace(new RegExp("\\b"+key+"\\b","gi"), micTypos[key]);
+
+            // REMOVE ARTICLES
+            s = s.replace(/\b(a|an|the)\b/gi, "").trim();
+
+            return s.replace(/\s+/g, " ").trim();
+        }
+
+        function checkAnswer(spoken) {
+            const rawCorrect = currentPairs[currentIndex].en;
+            
+            const correctWithParenthesesText = rawCorrect.replace(/[\(\)]/g, "");
+            const correctWithoutParenthesesText = rawCorrect.replace(/\([^)]*\)/g, " ");
+
+            const normalizedSpoken = normalize(spoken);
+            const isCorrect = (normalizedSpoken === normalize(correctWithParenthesesText)) || 
+                              (normalizedSpoken === normalize(correctWithoutParenthesesText));
+
+            document.getElementById('mic-btn').style.display = 'none';
+            const f = document.getElementById('feedback');
+            
+            if(isCorrect) { 
+                f.innerHTML = "Correct!"; 
+                f.className = "correct"; 
+                score++; 
+            } else { 
+                f.innerHTML = `Incorrect.<br><span class="correction">${correctWithParenthesesText}</span>`; 
+                f.className = "incorrect"; 
+            }
+            
+            document.getElementById('current-score').innerText = score;
+            if(currentIndex < currentPairs.length - 1) document.getElementById('next-btn').style.display = 'inline-block';
+            else document.getElementById('finish-btn').style.display = 'inline-block';
+        }
+
+        function nextSentence() { currentIndex++; loadSentence(); }
+
+        function saveProgress() {
+            if (!lessonScores[currentLessonId] || score > lessonScores[currentLessonId]) {
+                lessonScores[currentLessonId] = score;
+                localStorage.setItem('lessonScores', JSON.stringify(lessonScores));
+            }
+        }
+
+        function backToMenu() {
+            saveProgress();
+            showScreen('menu-screen');
+        }
+
+        function finishLesson() {
+            saveProgress();
+            showScreen('menu-screen');
+        }
+
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        let recognition;
+        let silenceTimer = null;
+        let currentTranscript = "";
+        let isListening = false;
+
+        if (SpeechRecognition) {
+            recognition = new SpeechRecognition();
+            recognition.lang = 'en-US';
+            recognition.continuous = true;
+            recognition.interimResults = true;
+            
+            recognition.onstart = () => {
+                isListening = true;
+                currentTranscript = "";
+                const btn = document.getElementById('mic-btn');
+                btn.classList.add('listening');
+                btn.innerText = "🛑 Stop Listening"; 
+                document.getElementById('recognized-text').innerText = "Listening...";
+                
+                silenceTimer = setTimeout(() => {
+                    if (isListening) toggleMic();
+                }, 5000); 
+            };
+            
+            recognition.onend = () => {
+                isListening = false;
+                const btn = document.getElementById('mic-btn');
+                btn.classList.remove('listening');
+                btn.innerText = "🎤 Tap to Speak";
+                clearTimeout(silenceTimer);
+            };
+            
+            recognition.onresult = (e) => { 
+                clearTimeout(silenceTimer);
+                currentTranscript = "";
+                for (let i = 0; i < e.results.length; i++) {
+                    currentTranscript += e.results[i][0].transcript;
+                }
+                document.getElementById('recognized-text').innerText = "You said: " + currentTranscript;
+                
+                silenceTimer = setTimeout(() => {
+                    if (isListening) {
+                        recognition.stop();
+                        if (currentTranscript.trim() !== "") {
+                            checkAnswer(currentTranscript);
+                        } else {
+                            document.getElementById('recognized-text').innerText = "Nothing heard. Try again.";
+                        }
+                    }
+                }, 3000); 
+            };
+
+            recognition.onerror = (event) => {
+                isListening = false;
+                document.getElementById('mic-btn').classList.remove('listening');
+                document.getElementById('mic-btn').innerText = "🎤 Tap to Speak";
+                clearTimeout(silenceTimer);
+                
+                if (event.error === 'not-allowed') {
+                    alert("Microphone Blocked! \n\niPhone Users: Go to Settings > Safari > Microphone and select 'Allow'.\n\nAlso, make sure you opened this link directly in Safari, NOT inside WhatsApp or Instagram.");
+                } else if (event.error !== 'no-speech') {
+                    console.log("Microphone warning: " + event.error);
+                }
+            };
+        }
+
+        function toggleMic() { 
+            if (!recognition) {
+                alert("Speech Recognition is not supported here.\n\niPhone Users: Please open this link in the REAL Safari or Chrome app.");
+                return;
+            }
+            if (isListening) {
+                clearTimeout(silenceTimer);
+                recognition.stop();
+                if (currentTranscript.trim() !== "") {
+                    checkAnswer(currentTranscript);
+                } else {
+                    document.getElementById('recognized-text').innerText = "Nothing heard. Try again.";
+                }
+            } else {
+                try {
+                    recognition.start(); 
+                } catch(e) {
+                    console.log("Mic already listening or interrupted.");
+                }
+            }
+        }
+
+        buildMenu();
+    </script>
+</body>
+</html>
